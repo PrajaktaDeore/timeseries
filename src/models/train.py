@@ -5,8 +5,9 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout, GRU, Input
 from sklearn.preprocessing import MinMaxScaler
 import mlflow
-import os
 import matplotlib.pyplot as plt
+from pathlib import Path
+import os
 
 # Explicitly import mlflow.tensorflow for autologging
 import mlflow.tensorflow
@@ -14,6 +15,10 @@ import mlflow.tensorflow
 # Set up MLflow
 # Using local tracking for now to avoid server connectivity issues in sandbox
 # mlflow.set_tracking_uri("http://127.0.0.1:5000")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_PATH = PROJECT_ROOT / "data" / "processed" / "btcusd_processed.csv"
+DEFAULT_TRACKING_URI = f"sqlite:///{(PROJECT_ROOT / 'mlflow.db').as_posix()}"
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", DEFAULT_TRACKING_URI))
 mlflow.set_experiment("BTCUSD_Forecasting")
 mlflow.tensorflow.autolog()
 
@@ -59,12 +64,11 @@ def build_model(input_shape, model_type='LSTM', units=50, dropout=0.2):
 
 def train_model(model_type='LSTM', window_size=60, epochs=1, batch_size=64):
     # Load processed data
-    data_path = "data/processed/btcusd_processed.csv"
-    if not os.path.exists(data_path):
-        print(f"Error: {data_path} not found. Run ingestion.py first.")
+    if not DATA_PATH.exists():
+        print(f"Error: {DATA_PATH} not found. Run ingestion.py first.")
         return
 
-    df = pd.read_csv(data_path, index_col=0, parse_dates=True)
+    df = pd.read_csv(DATA_PATH, index_col=0, parse_dates=True)
     # Take only the last 500 rows for faster training in sandbox verification
     df = df.tail(500)
     

@@ -1,0 +1,16 @@
+creation_timestamp: 1772781744749
+current_stage: None
+deployment_job_state: null
+description: null
+last_updated_timestamp: 1772781744749
+model_id: m-9c95e777911b479c900233ea3dde4c93
+name: BTCUSD_Linear_Regression
+run_id: 324c6c00dbf64a67a09a134d6077768f
+run_link: null
+source: models:/m-9c95e777911b479c900233ea3dde4c93
+status: READY
+status_message: null
+storage_location: file:///C:/Users/sudar/OneDrive/Desktop/Praju Bizmetric/Machine_Learning/timeseries/sirsproject/timeseries/src/models/../../mlruns/669184524789606393/models/m-9c95e777911b479c900233ea3dde4c93/artifacts
+user_id: null
+version: 1
+workspace: default

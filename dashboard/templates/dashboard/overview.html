@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block title %}Overview | BTC Forecasting{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -17,30 +18,56 @@
 
 <div class="row">
     <div class="col-md-4">
-        <div class="card text-white bg-primary">
+        <div class="card stat-card stat-peach">
             <div class="card-body">
                 <h5 class="card-title">Latest Prediction</h5>
                 <p class="card-text h3">$ {{ latest_prediction }}</p>
-                <small>From best registered model</small>
+                <small>{{ latest_prediction_source }}</small>
             </div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card text-white bg-success">
+        <div class="card stat-card stat-mint">
             <div class="card-body">
-                <h5 class="card-title">Best Model Accuracy</h5>
+                <h5 class="card-title">Best Model MSE</h5>
                 <p class="card-text h3">{{ model_accuracy }}</p>
                 <small>Based on lowest MSE</small>
             </div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card text-white bg-info">
+        <div class="card stat-card stat-rose">
             <div class="card-body">
                 <h5 class="card-title">Registered Model Versions</h5>
                 <p class="card-text h3">{{ latest_versions|length }}</p>
                 <small>Versions in MLflow Registry</small>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">BTC Next 1-Hour Prediction by Model</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for item in model_predictions %}
+            <div class="col-md-4">
+                <div class="card h-100 border-0 text-white"
+                     style="{% if forloop.counter == 1 %}background: linear-gradient(135deg, #ff9f8f, #ff6f91);{% elif forloop.counter == 2 %}background: linear-gradient(135deg, #67d5b5, #4ea5ff);{% else %}background: linear-gradient(135deg, #f9b56e, #f78ca0);{% endif %} box-shadow: 0 10px 24px rgba(47, 51, 70, 0.14);">
+                    <div class="card-body">
+                        <h6 class="mb-1" style="opacity: 0.9;">{{ item.name }}</h6>
+                        <h4 class="mb-2">$ {{ item.prediction }}</h4>
+                        <small style="opacity: 0.9;">{{ item.source }}</small>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <p class="text-center text-muted mb-0">No model predictions available.</p>
+            </div>
+            {% endfor %}
         </div>
     </div>
 </div>
@@ -70,7 +97,7 @@
                                 <td>{{ run.start_time }}</td>
                                 <td>{{ run.model_type }}</td>
                                 <td>{{ run.mse|floatformat:6 }}</td>
-                                <td><span class="badge {% if run.status == 'FINISHED' %}bg-success{% else %}bg-secondary{% endif %}">{{ run.status }}</span></td>
+                                <td><span class="badge {% if run.status == 'FINISHED' %}status-finished{% else %}status-other{% endif %}">{{ run.status }}</span></td>
                             </tr>
                             {% empty %}
                             <tr>
@@ -92,8 +119,8 @@
                 <ul class="list-group list-group-flush">
                     {% for version in latest_versions %}
                     <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Version {{ version.version }}
-                        <span class="badge bg-primary rounded-pill">{{ version.current_stage }}</span>
+                        {{ version.model_name }} v{{ version.version }}
+                        <span class="badge bg-info rounded-pill">{{ version.current_stage }}</span>
                     </li>
                     {% empty %}
                     <li class="list-group-item text-muted text-center">No registered versions yet.</li>
@@ -109,9 +136,108 @@
         <h5 class="card-title mb-0">BTCUSD Price Forecast Visualization</h5>
     </div>
     <div class="card-body">
-        <div id="forecast-chart" style="height: 300px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; border: 1px dashed #dee2e6;">
-            <p class="text-muted">Interactive Plotly visualization will be integrated here in Phase 4.</p>
+        <div style="height: 320px;">
+            <canvas id="forecastChart"></canvas>
         </div>
     </div>
 </div>
+{{ recent_labels|json_script:"recent-labels" }}
+{{ recent_close_values|json_script:"recent-close-values" }}
+{{ model_predictions|json_script:"model-predictions" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    (function () {
+        const labels = JSON.parse(document.getElementById("recent-labels").textContent);
+        const closeValues = JSON.parse(document.getElementById("recent-close-values").textContent);
+        const predictions = JSON.parse(document.getElementById("model-predictions").textContent);
+
+        const canvas = document.getElementById("forecastChart");
+        if (!canvas || !labels.length || !closeValues.length) {
+            return;
+        }
+
+        const modelPoints = predictions.map((item) => {
+            const raw = String(item.prediction || "").replace(/,/g, "");
+            const numeric = Number(raw);
+            return Number.isFinite(numeric) ? numeric : null;
+        });
+        const markerSeries = (value) => {
+            const points = labels.map(() => null);
+            if (points.length > 0) {
+                points[points.length - 1] = value;
+            }
+            return points;
+        };
+
+        new Chart(canvas, {
+            type: "line",
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: "BTC Close (Recent)",
+                        data: closeValues,
+                        borderColor: "#5b9dff",
+                        backgroundColor: "rgba(91, 157, 255, 0.14)",
+                        fill: true,
+                        tension: 0.25,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    },
+                    {
+                        label: "ARIMA 1h",
+                        data: markerSeries(modelPoints[0]),
+                        borderColor: "#ff6f91",
+                        pointBackgroundColor: "#ff6f91",
+                        pointRadius: 5,
+                        showLine: false
+                    },
+                    {
+                        label: "LSTM 1h",
+                        data: markerSeries(modelPoints[1]),
+                        borderColor: "#4ea5ff",
+                        pointBackgroundColor: "#4ea5ff",
+                        pointRadius: 5,
+                        showLine: false
+                    },
+                    {
+                        label: "Linear Regression 1h",
+                        data: markerSeries(modelPoints[2]),
+                        borderColor: "#f78ca0",
+                        pointBackgroundColor: "#f78ca0",
+                        pointRadius: 5,
+                        showLine: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: "index",
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        position: "top"
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            maxTicksLimit: 8
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            callback: function(value) {
+                                return "$" + Number(value).toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    })();
+</script>
 {% endblock %}

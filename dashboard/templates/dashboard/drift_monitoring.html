@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Drift Monitoring | BTC Forecasting{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Drift Monitoring</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card stat-card stat-peach">
+            <div class="card-body">
+                <h6 class="mb-1">Status</h6>
+                <span class="badge {{ status_class }}">{{ status }}</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card stat-mint">
+            <div class="card-body">
+                <h6 class="mb-1">Current Close</h6>
+                <h4>$ {{ latest_close }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card stat-rose">
+            <div class="card-body">
+                <h6 class="mb-1">Recent Mean (30)</h6>
+                <h4>$ {{ recent_mean }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card stat-mint">
+            <div class="card-body">
+                <h6 class="mb-1">Drift Change</h6>
+                <h4>{{ drift_pct }}</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Comparison Summary</h5>
+    </div>
+    <div class="card-body">
+        <p class="mb-2"><strong>Baseline Mean (previous 30 records):</strong> $ {{ baseline_mean }}</p>
+        <p class="mb-0"><strong>Recent Mean (latest 30 records):</strong> $ {{ recent_mean }}</p>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header">
+        <h5 class="card-title mb-0">BTC Close Price Histogram</h5>
+    </div>
+    <div class="card-body">
+        <div style="height: 320px;">
+            <canvas id="btcHistogram"></canvas>
+        </div>
+    </div>
+</div>
+
+{{ close_values_for_hist|json_script:"close-values-hist" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    (function () {
+        const values = JSON.parse(document.getElementById("close-values-hist").textContent || "[]");
+        const canvas = document.getElementById("btcHistogram");
+        if (!canvas || !values.length) return;
+
+        const minValue = Math.min(...values);
+        const maxValue = Math.max(...values);
+        const binCount = 14;
+        const range = maxValue - minValue || 1;
+        const binSize = range / binCount;
+        const bins = new Array(binCount).fill(0);
+        const labels = [];
+
+        for (let i = 0; i < binCount; i++) {
+            const start = minValue + i * binSize;
+            const end = start + binSize;
+            labels.push(`$${Math.round(start).toLocaleString()}-$${Math.round(end).toLocaleString()}`);
+        }
+
+        values.forEach((value) => {
+            let idx = Math.floor((value - minValue) / binSize);
+            if (idx >= binCount) idx = binCount - 1;
+            if (idx < 0) idx = 0;
+            bins[idx] += 1;
+        });
+
+        new Chart(canvas, {
+            type: "bar",
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: "Frequency",
+                        data: bins,
+                        backgroundColor: "rgba(255, 127, 149, 0.55)",
+                        borderColor: "rgba(255, 127, 149, 1)",
+                        borderWidth: 1.5,
+                        borderRadius: 8
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        ticks: { maxTicksLimit: 6 }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: "Count"
+                        }
+                    }
+                }
+            }
+        });
+    })();
+</script>
+{% endblock %}

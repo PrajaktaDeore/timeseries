@@ -2,6 +2,10 @@ import yfinance as yf
 import pandas as pd
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = PROJECT_ROOT / "data"
 
 def download_btcusd_data(symbol="BTC-USD", period="max", interval="1d"):
     """
@@ -20,10 +24,11 @@ def download_btcusd_data(symbol="BTC-USD", period="max", interval="1d"):
             data.columns = data.columns.get_level_values(0)
             
         # Ensure the directory exists
-        os.makedirs("data/raw", exist_ok=True)
+        raw_dir = DATA_DIR / "raw"
+        os.makedirs(raw_dir, exist_ok=True)
         
         # Save to CSV
-        file_path = f"data/raw/{symbol.lower()}_historical.csv"
+        file_path = raw_dir / f"{symbol.lower()}_historical.csv"
         data.to_csv(file_path)
         print(f"Data saved to {file_path}")
         return data
@@ -50,8 +55,9 @@ def preprocess_data(df):
     df = df.dropna()
     
     # Save processed data
-    os.makedirs("data/processed", exist_ok=True)
-    processed_path = "data/processed/btcusd_processed.csv"
+    processed_dir = DATA_DIR / "processed"
+    os.makedirs(processed_dir, exist_ok=True)
+    processed_path = processed_dir / "btcusd_processed.csv"
     df.to_csv(processed_path)
     print(f"Processed data saved to {processed_path}")
     return df

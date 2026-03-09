@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block title %}ROI Analysis | BTC Forecasting{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -7,7 +8,7 @@
 
 <div class="row">
     <div class="col-md-6">
-        <div class="card text-white bg-success">
+        <div class="card stat-card stat-mint">
             <div class="card-body text-center">
                 <h5 class="card-title">Simulated Trading Profit</h5>
                 <p class="card-text display-4">${{ latest_roi.simulated_profit_usd|floatformat:2 }}</p>
@@ -16,13 +17,49 @@
         </div>
     </div>
     <div class="col-md-6">
-        <div class="card text-white bg-dark">
+        <div class="card stat-card stat-rose">
             <div class="card-body text-center">
                 <h5 class="card-title">Risk Reduction</h5>
                 <p class="card-text display-4">{{ latest_roi.risk_reduction_pct|floatformat:1 }}%</p>
                 <small>Reduction in drawdown using model predictions</small>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">All Model Comparison</h5>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>MSE</th>
+                    <th>MAE</th>
+                    <th>RMSE</th>
+                    <th>Latest Predicted Close</th>
+                    <th>Latest Run Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in model_comparison %}
+                <tr>
+                    <td>{{ row.model_name }}</td>
+                    <td>{{ row.mse }}</td>
+                    <td>{{ row.mae }}</td>
+                    <td>{{ row.rmse }}</td>
+                    <td>{% if row.predicted_close != "N/A" %}$ {{ row.predicted_close }}{% else %}N/A{% endif %}</td>
+                    <td>{{ row.run_time }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center">No model comparison data found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 

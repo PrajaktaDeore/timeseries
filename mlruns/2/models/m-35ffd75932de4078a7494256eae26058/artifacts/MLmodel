@@ -1,0 +1,23 @@
+artifact_path: file:///C:/Users/sudar/OneDrive/Desktop/Praju Bizmetric/Machine_Learning/timeseries/sirsproject/timeseries/mlruns/2/models/m-35ffd75932de4078a7494256eae26058/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.11.4
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.8.0
+    skops_trusted_types: null
+mlflow_version: 3.10.1
+model_id: m-35ffd75932de4078a7494256eae26058
+model_size_bytes: 631
+model_uuid: m-35ffd75932de4078a7494256eae26058
+prompts: null
+run_id: 87f3e3bec2a9482899d943bd91b76e4d
+utc_time_created: '2026-03-06 08:35:18.903734'

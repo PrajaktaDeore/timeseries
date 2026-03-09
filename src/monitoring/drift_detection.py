@@ -2,6 +2,11 @@ import pandas as pd
 from evidently.report import Report
 from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
 import os
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = PROJECT_ROOT / "data" / "processed"
+REPORT_PATH = PROJECT_ROOT / "dashboard" / "static" / "reports" / "drift_report.html"
 
 def check_data_drift(reference_data_path, current_data_path, report_save_path):
     """
@@ -37,7 +42,7 @@ def check_data_drift(reference_data_path, current_data_path, report_save_path):
 
 if __name__ == "__main__":
     # For demonstration, we'll use the same processed data split in two
-    processed_path = "data/processed/btcusd_processed.csv"
+    processed_path = DATA_DIR / "btcusd_processed.csv"
     if os.path.exists(processed_path):
         df = pd.read_csv(processed_path)
         # Simulate reference and current data
@@ -45,12 +50,14 @@ if __name__ == "__main__":
         ref = df.iloc[:mid_point]
         cur = df.iloc[mid_point:]
         
-        ref.to_csv("data/processed/reference_data.csv", index=False)
-        cur.to_csv("data/processed/current_data.csv", index=False)
+        reference_path = DATA_DIR / "reference_data.csv"
+        current_path = DATA_DIR / "current_data.csv"
+        ref.to_csv(reference_path, index=False)
+        cur.to_csv(current_path, index=False)
         
         drift_detected = check_data_drift(
-            "data/processed/reference_data.csv",
-            "data/processed/current_data.csv",
-            "dashboard/static/reports/drift_report.html"
+            reference_path,
+            current_path,
+            REPORT_PATH
         )
         print(f"Drift detected: {drift_detected}")

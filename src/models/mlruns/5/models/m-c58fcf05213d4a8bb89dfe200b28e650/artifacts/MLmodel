@@ -1,0 +1,22 @@
+artifact_path: file:///C:/Users/sudar/OneDrive/Desktop/Praju Bizmetric/Machine_Learning/timeseries/sirsproject/timeseries/src/models/mlruns/5/models/m-c58fcf05213d4a8bb89dfe200b28e650/artifacts
+flavors:
+  python_function:
+    data: data
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.tensorflow
+    python_version: 3.11.4
+  tensorflow:
+    code: null
+    data: data
+    keras_version: 2.20.0
+    model_type: keras
+    save_format: tf
+mlflow_version: 3.10.1
+model_id: m-c58fcf05213d4a8bb89dfe200b28e650
+model_size_bytes: 220062
+model_uuid: m-c58fcf05213d4a8bb89dfe200b28e650
+prompts: null
+run_id: e0999c87904947d0821e5e012b8b415b
+utc_time_created: '2026-03-08 10:58:19.249730'

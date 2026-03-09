@@ -4,10 +4,15 @@ from statsmodels.tsa.arima.model import ARIMA
 from sklearn.metrics import mean_squared_error
 import mlflow
 import mlflow.sklearn
-import os
 import warnings
+from pathlib import Path
+import os
 
 # Set up MLflow
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_PATH = PROJECT_ROOT / "data" / "processed" / "btcusd_processed.csv"
+DEFAULT_TRACKING_URI = f"sqlite:///{(PROJECT_ROOT / 'mlflow.db').as_posix()}"
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", DEFAULT_TRACKING_URI))
 mlflow.set_experiment("BTCUSD_ARIMA_Forecasting")
 
 # Suppress ARIMA warnings
@@ -21,12 +26,11 @@ def train_arima_model(p=5, d=1, q=0):
     q: Order of moving average
     """
     # Load processed data
-    data_path = "data/processed/btcusd_processed.csv"
-    if not os.path.exists(data_path):
-        print(f"Error: {data_path} not found. Run ingestion.py first.")
+    if not DATA_PATH.exists():
+        print(f"Error: {DATA_PATH} not found. Run ingestion.py first.")
         return
 
-    df = pd.read_csv(data_path, index_col=0, parse_dates=True)
+    df = pd.read_csv(DATA_PATH, index_col=0, parse_dates=True)
     
     # ARIMA uses univariate time series
     series = df['Close']

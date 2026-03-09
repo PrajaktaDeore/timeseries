@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/sudar/OneDrive/Desktop/Praju Bizmetric/Machine_Learning/timeseries/sirsproject/timeseries/src/models/../../mlruns/669184524789606393/324c6c00dbf64a67a09a134d6077768f/artifacts
+end_time: 1772781744811
+entry_point_name: ''
+experiment_id: '669184524789606393'
+lifecycle_stage: active
+run_id: 324c6c00dbf64a67a09a134d6077768f
+run_name: Linear_Regression_Baseline
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1772781734912
+status: 3
+tags: []
+user_id: sudar

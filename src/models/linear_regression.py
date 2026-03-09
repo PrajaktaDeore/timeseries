@@ -5,8 +5,14 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.model_selection import train_test_split
 import mlflow
 import mlflow.sklearn
-import os
 import matplotlib.pyplot as plt
+from pathlib import Path
+import os
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_PATH = PROJECT_ROOT / "data" / "processed" / "btcusd_processed.csv"
+DEFAULT_TRACKING_URI = f"sqlite:///{(PROJECT_ROOT / 'mlflow.db').as_posix()}"
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", DEFAULT_TRACKING_URI))
 
 # Set up MLflow
 mlflow.set_experiment("BTCUSD_Linear_Regression")
@@ -17,16 +23,18 @@ def train_linear_regression(test_size=0.2):
     Uses 'Close', 'MA7', 'MA21', 'Daily_Return', 'Volume' as features.
     """
     # Load processed data
-    data_path = "data/processed/btcusd_processed.csv"
-    if not os.path.exists(data_path):
-        print(f"Error: {data_path} not found. Run ingestion.py first.")
+    if not DATA_PATH.exists():
+        print(f"Error: {DATA_PATH} not found. Run ingestion.py first.")
         return
 
-    df = pd.read_csv(data_path, index_col=0, parse_dates=True)
+    df = pd.read_csv(DATA_PATH, index_col=0, parse_dates=True)
     
     # Feature Engineering for Linear Regression
     # We want to predict 'Close' price of the NEXT day using TODAY's features
-    df['Target'] = df['Close'].shift(-1)
+    # df['Target'] = df['Close'].shift(-1)
+
+#if want data hourly
+    df['Target'] = df['Close'].shift(-60)
     df = df.dropna()
     
     features = ['Close', 'MA7', 'MA21', 'Daily_Return', 'Volume']
