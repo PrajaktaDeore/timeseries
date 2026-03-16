@@ -1,11 +1,13 @@
 import os
 import sys
+from math import sqrt
 from pathlib import Path
 
 import mlflow
 import pandas as pd
 from django.shortcuts import render
 from mlflow.tracking import MlflowClient
+from statsmodels.tsa.arima.model import ARIMA
 
 from .models import ROIMetric
 
@@ -28,6 +30,57 @@ def _first_metric(run, metric_keys):
         if key in run.data.metrics:
             return run.data.metrics[key]
     return None
+
+
+def _latest_close_from_processed_csv():
+    processed_csv = PROJECT_ROOT / "data" / "processed" / "btcusd_processed.csv"
+    if not processed_csv.exists():
+        return None
+
+    df = pd.read_csv(processed_csv)
+    if df.empty or "Close" not in df.columns:
+        return None
+
+    return float(df["Close"].iloc[-1])
+
+
+def _arima_fallback_prediction():
+    processed_csv = PROJECT_ROOT / "data" / "processed" / "btcusd_processed.csv"
+    if not processed_csv.exists():
+        return _latest_close_from_processed_csv()
+
+    df = pd.read_csv(processed_csv)
+    if df.empty or "Close" not in df.columns or len(df["Close"]) < 30:
+        return _latest_close_from_processed_csv()
+
+    try:
+        model = ARIMA(df["Close"], order=(5, 1, 0))
+        model_fit = model.fit()
+        prediction = model_fit.forecast(steps=1)
+        return float(prediction.iloc[0])
+    except Exception:
+        return _latest_close_from_processed_csv()
+
+
+def _search_recent_runs(client, experiment_name, max_results=50):
+    experiment = client.get_experiment_by_name(experiment_name)
+    if not experiment:
+        return []
+
+    return client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        filter_string="attributes.status = 'FINISHED'",
+        order_by=["attributes.start_time DESC"],
+        max_results=max_results,
+    )
+
+
+def _first_available_metric(runs, metric_keys):
+    for run in runs:
+        value = _first_metric(run, metric_keys)
+        if value is not None:
+            return float(value), run
+    return None, None
 
 
 def _build_model_comparison():
@@ -54,26 +107,7 @@ def _build_model_comparison():
             )
             continue
 
-        experiment = client.get_experiment_by_name(experiment_name)
-        if not experiment:
-            rows.append(
-                {
-                    "model_name": model_name,
-                    "mse": "N/A",
-                    "mae": "N/A",
-                    "rmse": "N/A",
-                    "predicted_close": "N/A",
-                    "run_time": "N/A",
-                }
-            )
-            continue
-
-        runs = client.search_runs(
-            experiment_ids=[experiment.experiment_id],
-            filter_string="attributes.status = 'FINISHED'",
-            order_by=["attributes.start_time DESC"],
-            max_results=1,
-        )
+        runs = _search_recent_runs(client, experiment_name)
         if not runs:
             rows.append(
                 {
@@ -88,13 +122,24 @@ def _build_model_comparison():
             continue
 
         run = runs[0]
-        mse = _first_metric(run, ["test_mse", "mse"])
-        mae = _first_metric(run, ["mae", "test_mae"])
-        rmse = _first_metric(run, ["rmse", "test_rmse"])
-        predicted_close = _first_metric(
-            run, ["predicted_close_1h", "prediction_1h", "predicted_close", "predicted_price", "prediction"]
+        mse, mse_run = _first_available_metric(runs, ["test_mse", "mse"])
+        mae, mae_run = _first_available_metric(runs, ["mae", "test_mae"])
+        rmse, rmse_run = _first_available_metric(runs, ["rmse", "test_rmse"])
+        predicted_close, predicted_run = _first_available_metric(
+            runs, ["predicted_close_1h", "prediction_1h", "predicted_close", "predicted_price", "prediction"]
         )
-        run_time = pd.to_datetime(run.info.start_time, unit="ms").strftime("%Y-%m-%d %H:%M")
+
+        if rmse is None and mse is not None:
+            rmse = sqrt(mse)
+
+        if predicted_close is None:
+            if model_name == "ARIMA":
+                predicted_close = _arima_fallback_prediction()
+            else:
+                predicted_close = _latest_close_from_processed_csv()
+
+        metric_run = predicted_run or rmse_run or mae_run or mse_run or run
+        run_time = pd.to_datetime(metric_run.info.start_time, unit="ms").strftime("%Y-%m-%d %H:%M")
 
         rows.append(
             {
