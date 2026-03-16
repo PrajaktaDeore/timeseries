@@ -31,12 +31,29 @@ def _first_metric(run, metric_keys):
 
 
 def _build_model_comparison():
-    configure_mlflow()
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", MLFLOW_TRACKING_URI))
-    client = MlflowClient()
     rows = []
 
+    try:
+        configure_mlflow()
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", MLFLOW_TRACKING_URI))
+        client = MlflowClient()
+    except Exception:
+        client = None
+
     for model_name, experiment_name in MODEL_EXPERIMENTS:
+        if client is None:
+            rows.append(
+                {
+                    "model_name": model_name,
+                    "mse": "N/A",
+                    "mae": "N/A",
+                    "rmse": "N/A",
+                    "predicted_close": "N/A",
+                    "run_time": "N/A",
+                }
+            )
+            continue
+
         experiment = client.get_experiment_by_name(experiment_name)
         if not experiment:
             rows.append(

@@ -171,73 +171,111 @@ def dashboard_overview(request):
     """
     Fetches experiment data and model registry info from MLflow for the dashboard.
     """
-    configure_mlflow()
-    mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
-
-    client = MlflowClient()
-
     latest_prediction = "N/A"
     latest_prediction_source = "No prediction metric logged yet"
     model_mse = "N/A"
     runs_data = []
-    model_predictions = _get_model_predictions(client)
+    model_predictions = []
     recent_labels = []
     recent_close_values = []
+    latest_versions = []
+    mlflow_error = None
 
-    experiment_ids = []
-    for experiment_name in DEFAULT_EXPERIMENTS:
-        experiment = client.get_experiment_by_name(experiment_name)
-        if experiment:
-            experiment_ids.append(experiment.experiment_id)
+    try:
+        configure_mlflow()
+        mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
+        client = MlflowClient()
 
-    all_runs = []
-    if experiment_ids:
-        all_runs = client.search_runs(
-            experiment_ids=experiment_ids,
-            filter_string="attributes.status = 'FINISHED'",
-            order_by=["attributes.start_time DESC"],
-            max_results=200,
-        )
+        model_predictions = _get_model_predictions(client)
 
-        for run in all_runs[:10]:
-            mse_value = _first_metric(run, ["test_mse", "mse"])
-            runs_data.append(
-                {
-                    "run_id": run.info.run_id,
-                    "status": run.info.status,
-                    "model_type": run.data.params.get("model_type", "N/A"),
-                    "mse": mse_value if mse_value is not None else "N/A",
-                    "start_time": pd.to_datetime(run.info.start_time, unit="ms").strftime(
-                        "%Y-%m-%d %H:%M"
-                    ),
-                }
+        experiment_ids = []
+        for experiment_name in DEFAULT_EXPERIMENTS:
+            experiment = client.get_experiment_by_name(experiment_name)
+            if experiment:
+                experiment_ids.append(experiment.experiment_id)
+
+        all_runs = []
+        if experiment_ids:
+            all_runs = client.search_runs(
+                experiment_ids=experiment_ids,
+                filter_string="attributes.status = 'FINISHED'",
+                order_by=["attributes.start_time DESC"],
+                max_results=200,
             )
 
-        runs_with_mse = [
-            (run, _first_metric(run, ["test_mse", "mse"]))
-            for run in all_runs
-            if _first_metric(run, ["test_mse", "mse"]) is not None
-        ]
+            for run in all_runs[:10]:
+                mse_value = _first_metric(run, ["test_mse", "mse"])
+                runs_data.append(
+                    {
+                        "run_id": run.info.run_id,
+                        "status": run.info.status,
+                        "model_type": run.data.params.get("model_type", "N/A"),
+                        "mse": mse_value if mse_value is not None else "N/A",
+                        "start_time": pd.to_datetime(run.info.start_time, unit="ms").strftime(
+                            "%Y-%m-%d %H:%M"
+                        ),
+                    }
+                )
 
-        if runs_with_mse:
-            best_run, best_mse = min(runs_with_mse, key=lambda item: item[1])
-            model_mse = f"{best_mse:.4f}"
+            runs_with_mse = [
+                (run, _first_metric(run, ["test_mse", "mse"]))
+                for run in all_runs
+                if _first_metric(run, ["test_mse", "mse"]) is not None
+            ]
 
-        runs_with_prediction = [
-            run
-            for run in all_runs
-            if _first_metric(run, ["prediction", "latest_prediction", "predicted_price", "predicted_close"])
-            is not None
+            if runs_with_mse:
+                best_run, best_mse = min(runs_with_mse, key=lambda item: item[1])
+                model_mse = f"{best_mse:.4f}"
+
+            runs_with_prediction = [
+                run
+                for run in all_runs
+                if _first_metric(run, ["prediction", "latest_prediction", "predicted_price", "predicted_close"])
+                is not None
+            ]
+            if runs_with_prediction:
+                latest_prediction_run = runs_with_prediction[0]
+                latest_prediction_value = _first_metric(
+                    latest_prediction_run,
+                    ["prediction", "latest_prediction", "predicted_price", "predicted_close"],
+                )
+                latest_prediction = f"{latest_prediction_value:,.2f}"
+                model_type = latest_prediction_run.data.params.get("model_type", "Model")
+                latest_prediction_source = f"From latest {model_type} run metric"
+
+        for model_name in DEFAULT_REGISTERED_MODELS:
+            try:
+                registered_model = client.get_registered_model(model_name)
+                for version in registered_model.latest_versions:
+                    latest_versions.append(
+                        {
+                            "model_name": model_name,
+                            "version": version.version,
+                            "current_stage": _display_stage(version.current_stage),
+                        }
+                    )
+            except Exception:
+                continue
+    except Exception as exc:
+        mlflow_error = str(exc)
+        latest_close = _latest_close_from_processed_csv()
+        model_predictions = [
+            {
+                "name": "ARIMA",
+                "prediction": _format_prediction(latest_close),
+                "source": "MLflow unavailable: showing latest Close price",
+            },
+            {
+                "name": "LSTM",
+                "prediction": _format_prediction(latest_close),
+                "source": "MLflow unavailable: showing latest Close price",
+            },
+            {
+                "name": "Linear Regression",
+                "prediction": _format_prediction(latest_close),
+                "source": "MLflow unavailable: showing latest Close price",
+            },
         ]
-        if runs_with_prediction:
-            latest_prediction_run = runs_with_prediction[0]
-            latest_prediction_value = _first_metric(
-                latest_prediction_run,
-                ["prediction", "latest_prediction", "predicted_price", "predicted_close"],
-            )
-            latest_prediction = f"{latest_prediction_value:,.2f}"
-            model_type = latest_prediction_run.data.params.get("model_type", "Model")
-            latest_prediction_source = f"From latest {model_type} run metric"
 
     first_available_prediction = next(
         (item for item in model_predictions if item["prediction"] != "N/A"),
@@ -262,21 +300,6 @@ def dashboard_overview(request):
             recent_labels = [str(idx) for idx in tail_df.index.tolist()]
         recent_close_values = [float(value) for value in tail_df["Close"].tolist()]
 
-    latest_versions = []
-    for model_name in DEFAULT_REGISTERED_MODELS:
-        try:
-            registered_model = client.get_registered_model(model_name)
-            for version in registered_model.latest_versions:
-                latest_versions.append(
-                    {
-                        "model_name": model_name,
-                        "version": version.version,
-                        "current_stage": _display_stage(version.current_stage),
-                    }
-                )
-        except Exception:
-            continue
-
     context = {
         "latest_prediction": latest_prediction,
         "latest_prediction_source": latest_prediction_source,
@@ -286,6 +309,7 @@ def dashboard_overview(request):
         "model_predictions": model_predictions,
         "recent_labels": recent_labels,
         "recent_close_values": recent_close_values,
+        "mlflow_error": mlflow_error,
     }
 
     return render(request, "dashboard/overview.html", context)
