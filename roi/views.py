@@ -110,14 +110,19 @@ def _build_model_comparison():
 
         runs = _search_recent_runs(client, experiment_name)
         if not runs:
+            if model_name == "ARIMA":
+                predicted_close = _arima_fallback_prediction()
+            else:
+                predicted_close = _latest_close_from_processed_csv()
+
             rows.append(
                 {
                     "model_name": model_name,
                     "mse": "N/A",
                     "mae": "N/A",
                     "rmse": "N/A",
-                    "predicted_close": "N/A",
-                    "run_time": "N/A",
+                    "predicted_close": f"{float(predicted_close):,.2f}" if predicted_close is not None else "N/A",
+                    "run_time": "No MLflow run",
                 }
             )
             continue
