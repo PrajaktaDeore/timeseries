@@ -8,11 +8,16 @@ import mlflow.sklearn
 import matplotlib.pyplot as plt
 from pathlib import Path
 import os
+import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATA_PATH = PROJECT_ROOT / "data" / "processed" / "btcusd_processed.csv"
-DEFAULT_TRACKING_URI = f"sqlite:///{(PROJECT_ROOT / 'mlflow.db').as_posix()}"
-mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", DEFAULT_TRACKING_URI))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from project_config import PROCESSED_BTCUSD_CSV, configure_mlflow
+
+configure_mlflow()
+mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
 
 # Set up MLflow
 mlflow.set_experiment("BTCUSD_Linear_Regression")
@@ -23,11 +28,11 @@ def train_linear_regression(test_size=0.2):
     Uses 'Close', 'MA7', 'MA21', 'Daily_Return', 'Volume' as features.
     """
     # Load processed data
-    if not DATA_PATH.exists():
-        print(f"Error: {DATA_PATH} not found. Run ingestion.py first.")
+    if not PROCESSED_BTCUSD_CSV.exists():
+        print(f"Error: {PROCESSED_BTCUSD_CSV} not found. Run ingestion.py first.")
         return
 
-    df = pd.read_csv(DATA_PATH, index_col=0, parse_dates=True)
+    df = pd.read_csv(PROCESSED_BTCUSD_CSV, index_col=0, parse_dates=True)
     
     # Feature Engineering for Linear Regression
     # We want to predict 'Close' price of the NEXT day using TODAY's features
@@ -60,10 +65,16 @@ def train_linear_regression(test_size=0.2):
         # Metrics
         mse = mean_squared_error(y_test, predictions)
         mae = mean_absolute_error(y_test, predictions)
+
+        latest_features = X.tail(1)
+        next_prediction = float(model.predict(latest_features)[0])
         
         # Log metrics
         mlflow.log_metric("mse", mse)
         mlflow.log_metric("mae", mae)
+        mlflow.log_metric("predicted_close", next_prediction)
+        mlflow.log_metric("predicted_close_1h", next_prediction)
+        mlflow.log_metric("prediction_1h", next_prediction)
         
         # Log model with registry
         model_info = mlflow.sklearn.log_model(
@@ -74,6 +85,7 @@ def train_linear_regression(test_size=0.2):
         
         print(f"Linear Regression Training complete.")
         print(f"MSE: {mse:.4f}, MAE: {mae:.4f}")
+        print(f"Next predicted Close: {next_prediction:.2f}")
         print(f"Model registered as 'BTCUSD_Linear_Regression' at: {model_info.model_uri}")
         
         return model, mse, mae

@@ -13,9 +13,12 @@ from statsmodels.tsa.arima.model import ARIMA
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-from project_config import DEFAULT_EXPERIMENTS, DEFAULT_REGISTERED_MODELS
+from project_config import (
+    DEFAULT_EXPERIMENTS,
+    DEFAULT_REGISTERED_MODELS,
+    configure_mlflow,
+)
 
-DEFAULT_TRACKING_URI = f"sqlite:///{(PROJECT_ROOT / 'mlflow.db').as_posix()}"
 LINEAR_FEATURES = ["Close", "MA7", "MA21", "Daily_Return", "Volume"]
 
 
@@ -168,8 +171,8 @@ def dashboard_overview(request):
     """
     Fetches experiment data and model registry info from MLflow for the dashboard.
     """
-    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", DEFAULT_TRACKING_URI)
-    mlflow.set_tracking_uri(tracking_uri)
+    configure_mlflow()
+    mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
 
     client = MlflowClient()
 

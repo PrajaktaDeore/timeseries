@@ -13,7 +13,7 @@ from .models import ROIMetric
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-from project_config import MLFLOW_TRACKING_URI
+from project_config import MLFLOW_TRACKING_URI, configure_mlflow
 
 
 MODEL_EXPERIMENTS = [
@@ -31,6 +31,7 @@ def _first_metric(run, metric_keys):
 
 
 def _build_model_comparison():
+    configure_mlflow()
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", MLFLOW_TRACKING_URI))
     client = MlflowClient()
     rows = []

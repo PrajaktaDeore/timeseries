@@ -1,1 +1,6 @@
 venv/
+__pycache__/
+*.pyc
+mlruns/
+mlflow.db
+dashboard/db.sqlite3

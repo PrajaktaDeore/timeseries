@@ -7,12 +7,17 @@ import mlflow.sklearn
 import warnings
 from pathlib import Path
 import os
+import sys
 
 # Set up MLflow
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATA_PATH = PROJECT_ROOT / "data" / "processed" / "btcusd_processed.csv"
-DEFAULT_TRACKING_URI = f"sqlite:///{(PROJECT_ROOT / 'mlflow.db').as_posix()}"
-mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", DEFAULT_TRACKING_URI))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from project_config import PROCESSED_BTCUSD_CSV, configure_mlflow
+
+configure_mlflow()
+mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
 mlflow.set_experiment("BTCUSD_ARIMA_Forecasting")
 
 # Suppress ARIMA warnings
@@ -26,11 +31,11 @@ def train_arima_model(p=5, d=1, q=0):
     q: Order of moving average
     """
     # Load processed data
-    if not DATA_PATH.exists():
-        print(f"Error: {DATA_PATH} not found. Run ingestion.py first.")
+    if not PROCESSED_BTCUSD_CSV.exists():
+        print(f"Error: {PROCESSED_BTCUSD_CSV} not found. Run ingestion.py first.")
         return
 
-    df = pd.read_csv(DATA_PATH, index_col=0, parse_dates=True)
+    df = pd.read_csv(PROCESSED_BTCUSD_CSV, index_col=0, parse_dates=True)
     
     # ARIMA uses univariate time series
     series = df['Close']
@@ -54,12 +59,19 @@ def train_arima_model(p=5, d=1, q=0):
         # Forecast
         forecast_result = model_fit.forecast(steps=len(test))
         predictions = forecast_result
-        
+
         # Calculate MSE
         mse = mean_squared_error(test, predictions)
+
+        try:
+            next_prediction = float(model_fit.forecast(steps=1).iloc[0])
+        except Exception:
+            next_prediction = float(predictions.iloc[-1])
         
         # Log metrics
         mlflow.log_metric("mse", mse)
+        mlflow.log_metric("predicted_close", next_prediction)
+        mlflow.log_metric("prediction", next_prediction)
         
         # Log model (Note: logging statsmodels objects directly can be tricky with mlflow.sklearn, 
         # so we often save it as a generic python function or artifact, but here we try basic logging)
@@ -67,6 +79,7 @@ def train_arima_model(p=5, d=1, q=0):
         
         print(f"ARIMA Training complete.")
         print(f"MSE: {mse:.4f}")
+        print(f"Next predicted Close: {next_prediction:.2f}")
         
         return model_fit, mse
 

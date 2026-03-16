@@ -1,6 +1,7 @@
 import argparse
 import os
 from pathlib import Path
+import sys
 
 import mlflow
 import mlflow.tensorflow
@@ -13,8 +14,14 @@ from tensorflow.keras.models import Sequential
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATA_PATH = PROJECT_ROOT / "data" / "processed" / "btcusd_processed.csv"
-DEFAULT_TRACKING_URI = f"sqlite:///{(PROJECT_ROOT / 'mlflow.db').as_posix()}"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from project_config import PROCESSED_BTCUSD_CSV, configure_mlflow
+
+configure_mlflow()
+mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
+
 EXPERIMENT_NAME = "BTCUSD_LSTM_Forecasting"
 REGISTERED_MODEL_NAME = "BTCUSD_LSTM_Model"
 FEATURES = ["Close", "MA7", "MA21", "Daily_Return", "Volume"]
@@ -53,13 +60,12 @@ def build_lstm_model(input_shape, units=64, dropout=0.2):
 
 
 def train_lstm(window_size=60, epochs=10, batch_size=32, units=64, dropout=0.2):
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", DEFAULT_TRACKING_URI))
     mlflow.set_experiment(EXPERIMENT_NAME)
 
-    if not DATA_PATH.exists():
-        raise FileNotFoundError(f"{DATA_PATH} not found. Run ingestion first.")
+    if not PROCESSED_BTCUSD_CSV.exists():
+        raise FileNotFoundError(f"{PROCESSED_BTCUSD_CSV} not found. Run ingestion first.")
 
-    df = pd.read_csv(DATA_PATH, index_col=0, parse_dates=True)
+    df = pd.read_csv(PROCESSED_BTCUSD_CSV, index_col=0, parse_dates=True)
     x_data, y_data, scaler = prepare_sequences(df, window_size=window_size)
     if len(x_data) < 20:
         raise ValueError("Not enough rows to train LSTM. Increase input data size.")
